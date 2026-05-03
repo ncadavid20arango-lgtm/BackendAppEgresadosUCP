@@ -2,7 +2,11 @@
 const db = require('../config/db');
 const { validationResult } = require('express-validator');
 
-// ─── Listar todos (admin) ─────────────────────────────────────
+// Convierte string vacío a NULL — importante para campos ENUM en MySQL
+// Un ENUM no acepta '' como valor, lanza error. NULL sí es válido.
+const n = (v) => (v === '' || v === undefined || v === null) ? null : v;
+
+// ─── Listar todos (admin) ─────────────────────────────────────────
 const listar = async (req, res) => {
   try {
     const { buscar = '', pagina = 1, limite = 20 } = req.query;
@@ -37,7 +41,7 @@ const listar = async (req, res) => {
   }
 };
 
-// ─── Obtener uno ──────────────────────────────────────────────
+// ─── Obtener uno ──────────────────────────────────────────────────
 const obtener = async (req, res) => {
   const { id } = req.params;
 
@@ -80,7 +84,7 @@ const obtener = async (req, res) => {
   }
 };
 
-// ─── Actualizar perfil ────────────────────────────────────────
+// ─── Actualizar perfil ────────────────────────────────────────────
 const actualizar = async (req, res) => {
   const { id } = req.params;
 
@@ -103,43 +107,54 @@ const actualizar = async (req, res) => {
   try {
     await conn.beginTransaction();
 
+    // Datos básicos del usuario
     await conn.query(
       'UPDATE usuarios SET nombres=?, apellidos=?, programa=?, fecha_grado=? WHERE id=?',
-      [nombres, apellidos, programa, fecha_grado || null, id]
+      [n(nombres), n(apellidos), n(programa), n(fecha_grado), id]
     );
+
+    // Contacto — email_alterno puede ser '' → NULL
     await conn.query(
       'UPDATE datos_contacto SET telefono=?, celular=?, email_alterno=?, linkedin=? WHERE usuario_id=?',
-      [telefono, celular, email_alterno, linkedin, id]
+      [n(telefono), n(celular), n(email_alterno), n(linkedin), id]
     );
+
+    // Ubicación
     await conn.query(
       'UPDATE ubicacion SET pais=?, departamento=?, ciudad=?, barrio=?, direccion=? WHERE usuario_id=?',
-      [pais, departamento, ciudad, barrio, direccion, id]
+      [n(pais), n(departamento), n(ciudad), n(barrio), n(direccion), id]
     );
+
+    // Situación laboral — estado y salario_rango son ENUM → NULL si vacío
     await conn.query(
       `UPDATE situacion_laboral
        SET estado=?, empresa=?, cargo=?, sector=?, salario_rango=?, relacionado_carrera=?
        WHERE usuario_id=?`,
-      [estado, empresa, cargo, sector, salario_rango, relacionado_carrera ? 1 : 0, id]
+      [n(estado), n(empresa), n(cargo), n(sector), n(salario_rango),
+       relacionado_carrera ? 1 : 0, id]
     );
+
+    // Datos sociodemográficos — genero, nivel_educativo, estado_civil son ENUM → NULL si vacío
     await conn.query(
       `UPDATE datos_sociodemograficos
        SET fecha_nacimiento=?, genero=?, estrato=?, nivel_educativo=?, estado_civil=?
        WHERE usuario_id=?`,
-      [fecha_nacimiento || null, genero, estrato, nivel_educativo, estado_civil, id]
+      [n(fecha_nacimiento), n(genero), n(estrato) ? Number(estrato) : null,
+       n(nivel_educativo), n(estado_civil), id]
     );
 
     await conn.commit();
     return res.json({ ok: true, mensaje: 'Perfil actualizado correctamente' });
   } catch (err) {
     await conn.rollback();
-    console.error(err);
-    return res.status(500).json({ ok: false, mensaje: 'Error interno' });
+    console.error('Error actualizando perfil:', err.message);
+    return res.status(500).json({ ok: false, mensaje: `Error al guardar: ${err.message}` });
   } finally {
     conn.release();
   }
 };
 
-// ─── Activar / Desactivar (admin) ─────────────────────────────
+// ─── Activar / Desactivar (admin) ─────────────────────────────────
 const toggleActivo = async (req, res) => {
   const { id } = req.params;
   try {
