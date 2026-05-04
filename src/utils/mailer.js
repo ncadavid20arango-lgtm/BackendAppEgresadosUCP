@@ -1,19 +1,19 @@
-// src/utils/mailer.js — Gmail SMTP
+// src/utils/mailer.js — Mailjet SMTP
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  host:   'smtp.gmail.com',
+  host:   'in-v3.mailjet.com',
   port:   587,
   secure: false,
   auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
+    user: process.env.MAILJET_API_KEY,
+    pass: process.env.MAILJET_SECRET_KEY,
   },
 });
 
 transporter.verify((error) => {
-  if (error) console.error('❌ Error Gmail SMTP:', error.message);
-  else console.log('✅ Gmail SMTP listo');
+  if (error) console.error('❌ Error Mailjet SMTP:', error.message);
+  else console.log('✅ Mailjet SMTP listo');
 });
 
 const enviarCorreo = ({ to, subject, html }) =>
