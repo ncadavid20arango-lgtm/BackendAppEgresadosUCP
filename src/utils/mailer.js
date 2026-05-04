@@ -1,21 +1,27 @@
-// src/utils/mailer.js — Resend (producción)
-const { Resend } = require('resend');
+// src/utils/mailer.js — Gmail SMTP
+const nodemailer = require('nodemailer');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const transporter = nodemailer.createTransport({
+  host:   'smtp.gmail.com',
+  port:   587,
+  secure: false,
+  auth: {
+    user: process.env.MAIL_USER,
+    pass: process.env.MAIL_PASS,
+  },
+});
 
-const enviarCorreo = async ({ to, subject, html }) => {
-  const { data, error } = await resend.emails.send({
-    from: 'UCP Egresados <onboarding@resend.dev>',
+transporter.verify((error) => {
+  if (error) console.error('❌ Error Gmail SMTP:', error.message);
+  else console.log('✅ Gmail SMTP listo');
+});
+
+const enviarCorreo = ({ to, subject, html }) =>
+  transporter.sendMail({
+    from:    process.env.MAIL_FROM,
     to,
     subject,
     html,
   });
-  if (error) {
-    console.error('❌ Error Resend:', error);
-    throw new Error(error.message);
-  }
-  console.log('✅ Correo enviado:', data?.id);
-  return data;
-};
 
 module.exports = { enviarCorreo };
