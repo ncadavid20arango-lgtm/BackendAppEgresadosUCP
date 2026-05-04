@@ -1,18 +1,21 @@
-// src/utils/mailer.js
-// Módulo centralizado de envío de correos
-const nodemailer = require('nodemailer');
+// src/utils/mailer.js — Resend (producción)
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-  host:   process.env.MAIL_HOST,
-  port:   Number(process.env.MAIL_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-const enviarCorreo = ({ to, subject, html }) =>
-  transporter.sendMail({ from: process.env.MAIL_FROM, to, subject, html });
+const enviarCorreo = async ({ to, subject, html }) => {
+  const { data, error } = await resend.emails.send({
+    from: 'UCP Egresados <onboarding@resend.dev>',
+    to,
+    subject,
+    html,
+  });
+  if (error) {
+    console.error('❌ Error Resend:', error);
+    throw new Error(error.message);
+  }
+  console.log('✅ Correo enviado:', data?.id);
+  return data;
+};
 
 module.exports = { enviarCorreo };
