@@ -1,10 +1,10 @@
-// src/utils/mailer.js — Mailjet SMTP
+// src/utils/mailer.js — Mailjet puerto 465
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
   host:   'in-v3.mailjet.com',
-  port:   587,
-  secure: false,
+  port:   465,
+  secure: true,
   auth: {
     user: process.env.MAILJET_API_KEY,
     pass: process.env.MAILJET_SECRET_KEY,
@@ -12,8 +12,8 @@ const transporter = nodemailer.createTransport({
 });
 
 transporter.verify((error) => {
-  if (error) console.error('❌ Error Mailjet SMTP:', error.message);
-  else console.log('✅ Mailjet SMTP listo');
+  if (error) console.error('❌ Error Mailjet 465:', error.message);
+  else console.log('✅ Mailjet listo');
 });
 
 const enviarCorreo = ({ to, subject, html }) =>
