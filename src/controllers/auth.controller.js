@@ -17,7 +17,6 @@ const register = async (req, res) => {
     email, password, codigo_estudiantil, programa, rol_id = 2
   } = req.body;
 
-  // Solo correos institucionales
   if (!email.endsWith('@ucp.edu.co')) {
     return res.status(422).json({
       ok: false,
@@ -46,13 +45,11 @@ const register = async (req, res) => {
 
     const uid = result.insertId;
 
-    // Registros vacíos relacionados
     await db.query('INSERT INTO datos_contacto (usuario_id) VALUES (?)', [uid]);
     await db.query('INSERT INTO ubicacion (usuario_id) VALUES (?)', [uid]);
     await db.query('INSERT INTO situacion_laboral (usuario_id) VALUES (?)', [uid]);
     await db.query('INSERT INTO datos_sociodemograficos (usuario_id) VALUES (?)', [uid]);
 
-    // Token de verificación de email (24h)
     const token = crypto.randomBytes(32).toString('hex');
     const expira = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await db.query(
@@ -66,36 +63,36 @@ const register = async (req, res) => {
     // Correo en try-catch separado — si falla el registro igual es exitoso
     try {
       await enviarCorreo({
-      to:      email,
-      subject: 'UCP Egresados — Verifica tu correo electrónico',
-      html: `
-        <div style="font-family:sans-serif;max-width:600px;margin:auto;">
-          <div style="background:#1a5c38;padding:24px;text-align:center;">
-            <h1 style="color:#fff;margin:0;font-size:28px;letter-spacing:4px;">UCP</h1>
-            <p style="color:#a8d5b8;margin:4px 0 0;">Universidad Católica de Pereira</p>
-          </div>
-          <div style="padding:32px;">
-            <h2 style="color:#1a5c38;">Hola ${nombres},</h2>
-            <p>Gracias por registrarte en el Sistema de Egresados. 
-               Por favor verifica tu correo haciendo clic en el botón:</p>
-            <div style="text-align:center;margin:32px 0;">
-              <a href="${enlace}"
-                 style="background:#1a5c38;color:#fff;padding:14px 32px;
-                        border-radius:8px;text-decoration:none;font-weight:700;">
-                Verificar mi correo
-              </a>
+        to:      email,
+        subject: 'UCP Egresados — Verifica tu correo electrónico',
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:auto;">
+            <div style="background:#1a5c38;padding:24px;text-align:center;">
+              <h1 style="color:#fff;margin:0;font-size:28px;letter-spacing:4px;">UCP</h1>
+              <p style="color:#a8d5b8;margin:4px 0 0;">Universidad Católica de Pereira</p>
             </div>
-            <p style="color:#888;font-size:13px;">
-              Este enlace expira en 24 horas.<br>
-              Si no creaste esta cuenta, ignora este mensaje.
-            </p>
+            <div style="padding:32px;">
+              <h2 style="color:#1a5c38;">Hola ${nombres},</h2>
+              <p>Gracias por registrarte en el Sistema de Egresados.
+                 Por favor verifica tu correo haciendo clic en el botón:</p>
+              <div style="text-align:center;margin:32px 0;">
+                <a href="${enlace}"
+                   style="background:#1a5c38;color:#fff;padding:14px 32px;
+                          border-radius:8px;text-decoration:none;font-weight:700;">
+                  Verificar mi correo
+                </a>
+              </div>
+              <p style="color:#888;font-size:13px;">
+                Este enlace expira en 24 horas.<br>
+                Si no creaste esta cuenta, ignora este mensaje.
+              </p>
+            </div>
+            <div style="background:#f5f7f6;padding:16px;text-align:center;">
+              <div style="width:40px;height:4px;background:#c8102e;border-radius:2px;margin:0 auto 8px;"></div>
+              <p style="color:#888;font-size:11px;margin:0;">© Universidad Católica de Pereira</p>
+            </div>
           </div>
-          <div style="background:#f5f7f6;padding:16px;text-align:center;">
-            <div style="width:40px;height:4px;background:#c8102e;border-radius:2px;margin:0 auto 8px;"></div>
-            <p style="color:#888;font-size:11px;margin:0;">© Universidad Católica de Pereira</p>
-          </div>
-        </div>
-      `,
+        `,
       });
       console.log('✅ Correo de verificación enviado a:', email);
     } catch (mailErr) {
@@ -175,7 +172,6 @@ const login = async (req, res) => {
     if (!usuario.activo)
       return res.status(403).json({ ok: false, mensaje: 'Cuenta desactivada. Contacta al administrador.' });
 
-    // Admins no necesitan verificar email
     if (usuario.rol !== 'admin' && !usuario.email_verificado)
       return res.status(403).json({
         ok: false,
@@ -249,13 +245,12 @@ const solicitarRecuperacion = async (req, res) => {
     const [rows] = await db.query(
       'SELECT id, nombres FROM usuarios WHERE email = ? AND activo = 1', [email]
     );
-    // Siempre responder igual para no revelar si el email existe
     if (rows.length === 0)
       return res.json({ ok: true, mensaje: 'Si el correo existe, recibirás un enlace.' });
 
     const { id, nombres } = rows[0];
     const token  = crypto.randomBytes(32).toString('hex');
-    const expira = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 horas
+    const expira = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
     await db.query(
       `INSERT INTO tokens_recuperacion (usuario_id, token, tipo, expira_en)
@@ -265,33 +260,37 @@ const solicitarRecuperacion = async (req, res) => {
 
     const enlace = `${process.env.APP_URL}/api/auth/reset-password/${token}`;
 
-    // Correo en try-catch separado — si falla el registro igual es exitoso
+    // Correo en try-catch separado
     try {
       await enviarCorreo({
-      to:      email,
-      subject: 'UCP Egresados — Recuperación de contraseña',
-      html: `
-        <div style="font-family:sans-serif;max-width:600px;margin:auto;">
-          <div style="background:#1a5c38;padding:24px;text-align:center;">
-            <h1 style="color:#fff;margin:0;letter-spacing:4px;">UCP</h1>
-          </div>
-          <div style="padding:32px;">
-            <h2 style="color:#1a5c38;">Hola ${nombres},</h2>
-            <p>Recibimos una solicitud para restablecer tu contraseña.</p>
-            <div style="text-align:center;margin:32px 0;">
-              <a href="${enlace}"
-                 style="background:#c8102e;color:#fff;padding:14px 32px;
-                        border-radius:8px;text-decoration:none;font-weight:700;">
-                Restablecer contraseña
-              </a>
+        to:      email,
+        subject: 'UCP Egresados — Recuperación de contraseña',
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:auto;">
+            <div style="background:#1a5c38;padding:24px;text-align:center;">
+              <h1 style="color:#fff;margin:0;letter-spacing:4px;">UCP</h1>
             </div>
-            <p style="color:#888;font-size:13px;">
-              Válido por 2 horas. Si no solicitaste esto, ignora este mensaje.
-            </p>
+            <div style="padding:32px;">
+              <h2 style="color:#1a5c38;">Hola ${nombres},</h2>
+              <p>Recibimos una solicitud para restablecer tu contraseña.</p>
+              <div style="text-align:center;margin:32px 0;">
+                <a href="${enlace}"
+                   style="background:#c8102e;color:#fff;padding:14px 32px;
+                          border-radius:8px;text-decoration:none;font-weight:700;">
+                  Restablecer contraseña
+                </a>
+              </div>
+              <p style="color:#888;font-size:13px;">
+                Válido por 2 horas. Si no solicitaste esto, ignora este mensaje.
+              </p>
+            </div>
           </div>
-        </div>
-      `,
-    });
+        `,
+      });
+      console.log('✅ Correo de recuperación enviado a:', email);
+    } catch (mailErr) {
+      console.error('⚠️ Error enviando correo recuperación:', mailErr.message);
+    }
 
     return res.json({ ok: true, mensaje: 'Si el correo existe, recibirás un enlace.' });
   } catch (err) {
