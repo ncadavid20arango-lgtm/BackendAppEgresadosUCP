@@ -63,7 +63,9 @@ const register = async (req, res) => {
 
     const enlace = `${process.env.APP_URL}/api/auth/verificar-email/${token}`;
 
-    await enviarCorreo({
+    // Correo en try-catch separado — si falla el registro igual es exitoso
+    try {
+      await enviarCorreo({
       to:      email,
       subject: 'UCP Egresados — Verifica tu correo electrónico',
       html: `
@@ -94,7 +96,11 @@ const register = async (req, res) => {
           </div>
         </div>
       `,
-    });
+      });
+      console.log('✅ Correo de verificación enviado a:', email);
+    } catch (mailErr) {
+      console.error('⚠️ Error enviando correo (usuario registrado igual):', mailErr.message);
+    }
 
     return res.status(201).json({
       ok: true,
@@ -259,7 +265,9 @@ const solicitarRecuperacion = async (req, res) => {
 
     const enlace = `${process.env.APP_URL}/api/auth/reset-password/${token}`;
 
-    await enviarCorreo({
+    // Correo en try-catch separado — si falla el registro igual es exitoso
+    try {
+      await enviarCorreo({
       to:      email,
       subject: 'UCP Egresados — Recuperación de contraseña',
       html: `
