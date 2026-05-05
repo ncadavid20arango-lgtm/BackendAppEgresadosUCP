@@ -9,7 +9,7 @@ const enviarCorreo = ({ to, subject, html }) => {
 
     const body = JSON.stringify({
       Messages: [{
-        From: { Email: 'ncadavid20arango@gmail.com', Name: 'UCP Egresados' },
+        From: { Email: process.env.MAIL_USER, Name: 'UCP Egresados' },
         To:   [{ Email: to }],
         Subject: subject,
         HTMLPart: html,
