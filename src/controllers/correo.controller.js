@@ -1,11 +1,17 @@
 // src/controllers/correo.controller.js
-// Recordatorios via push notifications (sin correo)
 const db  = require('../config/db');
 const { enviarPushNotificacion } = require('../utils/push');
 
 // ─── Recordatorio individual ──────────────────────────────────
 const enviarRecordatorio = async (req, res) => {
-  const { usuario_id } = req.body;
+  const { usuario_id, titulo, mensaje } = req.body;
+
+  if (!usuario_id)
+    return res.status(422).json({ ok: false, mensaje: 'usuario_id requerido' });
+
+  const tituloFinal  = titulo  || '📋 Actualiza tu información';
+  const mensajeFinal = mensaje || 'El equipo de egresados UCP te invita a actualizar tus datos.';
+
   try {
     const [[usuario]] = await db.query(
       'SELECT id, nombres, push_token FROM usuarios WHERE id = ? AND activo = 1',
@@ -14,28 +20,23 @@ const enviarRecordatorio = async (req, res) => {
     if (!usuario)
       return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
 
-    // Guardar mensaje en BD para mostrarlo en la app al abrir
+    // Guardar en BD para mostrar en la app
     await db.query(
-      `INSERT INTO notificaciones (usuario_id, titulo, mensaje, leido)
-       VALUES (?, ?, ?, 0)`,
-      [
-        usuario_id,
-        '📋 Actualiza tu información',
-        'El equipo de egresados UCP te invita a actualizar tus datos de contacto y situación laboral.'
-      ]
+      'INSERT INTO notificaciones (usuario_id, titulo, mensaje, leido) VALUES (?, ?, ?, 0)',
+      [usuario_id, tituloFinal, mensajeFinal]
     );
 
     // Push notification si tiene token
     if (usuario.push_token) {
       await enviarPushNotificacion(
         usuario.push_token,
-        '📋 UCP Egresados',
-        '¡Hola ' + usuario.nombres + '! Te invitamos a actualizar tu información.',
+        tituloFinal,
+        mensajeFinal,
         { tipo: 'recordatorio', usuario_id }
-      );
+      ).catch(err => console.error('Push error:', err.message));
     }
 
-    return res.json({ ok: true, mensaje: `Recordatorio enviado a ${usuario.nombres}` });
+    return res.json({ ok: true, mensaje: `Notificación enviada a ${usuario.nombres}` });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ ok: false, mensaje: 'Error interno' });
@@ -44,43 +45,30 @@ const enviarRecordatorio = async (req, res) => {
 
 // ─── Recordatorio masivo ──────────────────────────────────────
 const enviarRecordatorioMasivo = async (req, res) => {
+  const titulo  = '📋 Actualiza tu información';
+  const mensaje = 'El equipo de egresados UCP te invita a actualizar tus datos de contacto y situación laboral.';
+
   try {
     const [usuarios] = await db.query(
-      `SELECT id, nombres, push_token FROM usuarios
-       WHERE activo = 1 AND rol_id IN (1,2)`
+      'SELECT id, nombres, push_token FROM usuarios WHERE activo = 1 AND rol_id IN (1,2)'
     );
 
-    let notificados = 0;
+    let enviados = 0;
     for (const u of usuarios) {
       try {
-        // Mensaje en BD
         await db.query(
-          `INSERT INTO notificaciones (usuario_id, titulo, mensaje, leido)
-           VALUES (?, ?, ?, 0)`,
-          [
-            u.id,
-            '📋 Actualiza tu información',
-            'El equipo de egresados UCP te invita a actualizar tus datos.'
-          ]
+          'INSERT INTO notificaciones (usuario_id, titulo, mensaje, leido) VALUES (?, ?, ?, 0)',
+          [u.id, titulo, mensaje]
         );
-
-        // Push si tiene token
         if (u.push_token) {
-          await enviarPushNotificacion(
-            u.push_token,
-            '📋 UCP Egresados',
-            '¡Hola ' + u.nombres + '! Recuerda actualizar tu información.',
-            { tipo: 'recordatorio_masivo' }
-          );
+          await enviarPushNotificacion(u.push_token, titulo, mensaje, { tipo: 'masivo' })
+            .catch(() => {});
         }
-        notificados++;
+        enviados++;
       } catch (_) {}
     }
 
-    return res.json({
-      ok: true,
-      mensaje: `Recordatorio enviado a ${notificados} egresados`
-    });
+    return res.json({ ok: true, mensaje: `Notificación enviada a ${enviados} egresados` });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ ok: false, mensaje: 'Error interno' });
@@ -105,7 +93,7 @@ const obtenerNotificaciones = async (req, res) => {
   }
 };
 
-// ─── Marcar notificación como leída ──────────────────────────
+// ─── Marcar notificaciones como leídas ───────────────────────
 const marcarLeida = async (req, res) => {
   try {
     await db.query(
