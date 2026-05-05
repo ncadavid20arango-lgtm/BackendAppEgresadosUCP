@@ -2,7 +2,7 @@
 const { Router } = require('express');
 const { body }   = require('express-validator');
 const {
-  register, verificarEmail, login, miPerfil,
+  register, login, miPerfil,
   solicitarRecuperacion, resetPassword
 } = require('../controllers/auth.controller');
 const { authMiddleware } = require('../middlewares/auth.middleware');
@@ -17,9 +17,6 @@ router.post('/register', [
   body('email').isEmail().withMessage('Email inválido'),
   body('password').isLength({ min: 6 }).withMessage('Contraseña mínimo 6 caracteres'),
 ], register);
-
-// GET /api/auth/verificar-email/:token  (link del correo)
-router.get('/verificar-email/:token', verificarEmail);
 
 // POST /api/auth/login
 router.post('/login', [
