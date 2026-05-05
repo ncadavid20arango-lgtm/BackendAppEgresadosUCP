@@ -1,59 +1,25 @@
-// src/utils/mailer.js — Mailjet API HTTP (puerto 443)
-const https = require('https');
+// src/utils/mailer.js — Gmail SMTP
+const nodemailer = require('nodemailer');
 
-const enviarCorreo = ({ to, subject, html }) => {
-  return new Promise((resolve, reject) => {
-    const auth = Buffer.from(
-      `${process.env.MAILJET_API_KEY}:${process.env.MAILJET_SECRET_KEY}`
-    ).toString('base64');
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.MAIL_USER,
+    pass: process.env.MAIL_PASS,
+  },
+});
 
-    const body = JSON.stringify({
-      Messages: [{
-        From: { Email: process.env.MAIL_USER, Name: 'UCP Egresados' },
-        To:   [{ Email: to }],
-        Subject: subject,
-        HTMLPart: html,
-      }]
-    });
+transporter.verify((error) => {
+  if (error) console.error('❌ Error Gmail SMTP:', error.message);
+  else console.log('✅ Gmail SMTP listo:', process.env.MAIL_USER);
+});
 
-    const options = {
-      hostname: 'api.mailjet.com',
-      path:     '/v3.1/send',
-      method:   'POST',
-      headers: {
-        'Authorization':  `Basic ${auth}`,
-        'Content-Type':   'application/json',
-        'Content-Length':  Buffer.byteLength(body),
-      },
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', chunk => { data += chunk; });
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          if (res.statusCode === 200) {
-            console.log('✅ Correo enviado a:', to);
-            resolve(parsed);
-          } else {
-            console.error('❌ Error Mailjet API:', data);
-            reject(new Error(parsed.ErrorMessage || `Error ${res.statusCode}`));
-          }
-        } catch (e) {
-          reject(new Error('Error parseando respuesta Mailjet'));
-        }
-      });
-    });
-
-    req.on('error', (err) => {
-      console.error('❌ Error Mailjet request:', err.message);
-      reject(err);
-    });
-
-    req.write(body);
-    req.end();
+const enviarCorreo = ({ to, subject, html }) =>
+  transporter.sendMail({
+    from:    process.env.MAIL_FROM,
+    to,
+    subject,
+    html,
   });
-};
 
 module.exports = { enviarCorreo };
